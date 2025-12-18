@@ -1,24 +1,35 @@
-# Nom de l'exécutable final
-EXEC = water_proc
-
-# Compilateur et options (O3 pour optimiser la vitesse sur les 8 millions de lignes)
+# Définition du compilateur
 CC = gcc
+
+# Options de compilation :
+# -Wall -Wextra : affiche tous les avertissements pour un code propre
+# -O3 : optimisation maximale pour la vitesse de traitement
 CFLAGS = -Wall -Wextra -O3
 
-# Règle par défaut
+# Nom de l'exécutable final
+EXEC = water_processor
+
+# Liste des fichiers objets (les fichiers .c compilés en .o)
+OBJ = main.o avl.o
+
+# Règle principale (appelée par défaut via la commande 'make')
 all: $(EXEC)
 
-# Compilation de l'exécutable
-$(EXEC): main.o
-	$(CC) $(CFLAGS) -o $(EXEC) main.o
+# Création de l'exécutable à partir des objets
+$(EXEC): $(OBJ)
+	$(CC) $(CFLAGS) $(OBJ) -o $(EXEC)
 
-# Compilation de l'objet main.o
-main.o: main.c
+# Compilation du fichier main.c
+main.o: main.c avl.h
 	$(CC) $(CFLAGS) -c main.c
 
-# Règle pour nettoyer le dossier (supprime l'exécutable et les fichiers .o)
+# Compilation du fichier avl.c
+avl.o: avl.c avl.h
+	$(CC) $(CFLAGS) -c avl.c
+
+# Règle pour nettoyer les fichiers temporaires
 clean:
 	rm -f *.o $(EXEC)
 
-# Règle pour forcer la recompilation
-re: clean all
+# Règle pour tout recompiler
+rebuild: clean all

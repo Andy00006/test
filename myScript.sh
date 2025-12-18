@@ -1,34 +1,48 @@
 #!/bin/bash
 
-# Vérification des arguments
+# Vérification
 if [ "$#" -lt 3 ]; then
-    echo "Usage: $0 <fichier.csv> <histo|leaks> <option|id_usine>"
+    echo "Erreur : Paramètres manquants."
     exit 1
 fi
 
-DATA_FILE=$1
-MODE=$2
-PARAM=$3
+FICHIER=$1; MODE=$2; OPTION=$3
+DEBUT=$(date +%s%3N)
 
-# Compilation automatique
-if [ ! -f "prog_c" ]; then
-    gcc -O3 main.c -o prog_c
-fi
+# Compilation automatique (Makefile requis)
+make > /dev/null
 
-# Mesure du temps
-START_TIME=$(date +%s%N)
-
-# Exécution du programme C
 if [ "$MODE" == "histo" ]; then
-    OUTPUT_FILE="vol_${PARAM}.dat"
-    echo "identifier;volume" > "$OUTPUT_FILE"
-    ./prog_c "$DATA_FILE" "histo" "$PARAM" >> "$OUTPUT_FILE"
+    NOM_OUT="vol_${OPTION}.dat"
+    echo "identifier;volume" > "$NOM_OUT"
+    ./water_proc "$FICHIER" histo "$OPTION" >> "$NOM_OUT"
+    
+    # Tri pour Gnuplot
+    grep -v "identifier" "$NOM_OUT" | sort -t';' -k2 -rn > temp.dat
+    head -n 10 temp.dat > top10.dat
+    tail -n 50 temp.dat > bottom50.dat
+
+    # Gnuplot
+    gnuplot << EOF
+        set terminal png size 1000,600
+        set datafile separator ";"
+        set style fill solid
+        set xtics rotate by -45
+        set output "top10_${OPTION}.png"
+        set title "Les 10 plus grandes usines ($OPTION)"
+        plot "top10.dat" using 2:xtic(1) with boxes notitle
+        
+        set output "bottom50_${OPTION}.png"
+        set title "Les 50 plus petites usines ($OPTION)"
+        plot "bottom50.dat" using 2:xtic(1) with boxes notitle
+EOF
+    rm temp.dat top10.dat bottom50.dat
+    echo "Images générées avec succès."
+
 elif [ "$MODE" == "leaks" ]; then
-    OUTPUT_FILE="leaks.dat"
-    ./prog_c "$DATA_FILE" "leaks" "$PARAM" >> "$OUTPUT_FILE"
+    ./water_proc "$FICHIER" leaks "$OPTION" >> "rendement.dat"
+    echo "Résultat ajouté à rendement.dat"
 fi
 
-END_TIME=$(date +%s%N)
-DURATION=$(( (END_TIME - START_TIME) / 1000000 ))
-
-echo "Traitement terminé en $DURATION ms."
+FIN=$(date +%s%3N)
+echo "Durée totale : $((FIN - DEBUT)) ms"

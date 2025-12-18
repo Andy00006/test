@@ -84,6 +84,10 @@ EOF
     echo "Graphiques générés : ${OPTION}_top10.png et ${OPTION}_bot50.png"
 fi
 
+if [ ! -f "./water_processor" ]; then
+    make
+fi
+
 # --- FIN ET CHRONOMÈTRE ---
 
 fin=$(date +%s%3N)

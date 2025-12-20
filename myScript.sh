@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# 1. Capture du temps de début
+# 1. Capture du temps de début (en millisecondes)
 debut=$(date +%s%3N)
 
 # --- FONCTIONS ---
+
 afficher_usage() {
     echo "Usage: $0 <fichier_donnees> <mode> <option/ID>"
     echo "Modes disponibles :"
@@ -12,12 +13,24 @@ afficher_usage() {
     exit 1
 }
 
-# --- VÉRIFICATIONS ---
-if [ "$#" -lt 3 ]; then afficher_usage; fi
+# --- VÉRIFICATIONS DES ARGUMENTS ---
+
+if [ "$#" -lt 3 ]; then
+    afficher_usage
+fi
 
 FICHIER_CSV=$1
 MODE=$2
 OPTION=$3
+
+# Vérification rigoureuse de l'option pour le mode histo
+if [ "$MODE" == "histo" ]; then
+    if [[ "$OPTION" != "max" && "$OPTION" != "src" && "$OPTION" != "real" ]]; then
+        echo "Erreur : L'option '$OPTION' est invalide."
+        echo "Options acceptées pour 'histo' : max, src, real"
+        exit 1
+    fi
+fi
 
 if [ ! -f "$FICHIER_CSV" ]; then
     echo "Erreur : Le fichier '$FICHIER_CSV' est introuvable."
@@ -25,31 +38,42 @@ if [ ! -f "$FICHIER_CSV" ]; then
 fi
 
 # --- COMPILATION ---
+
 if [ ! -f "./water_processor" ]; then
-    echo "Compilation en cours..."
+    echo "Exécutable introuvable. Compilation..."
     make
+    [ $? -ne 0 ] && echo "Erreur de compilation." && exit 3
 fi
 
-# --- EXÉCUTION ---
-echo "Traitement C en cours..."
+# --- EXÉCUTION DU PROGRAMME C ---
+
+echo "Traitement en cours... (veuillez patienter)"
 ./water_processor "$FICHIER_CSV" "$MODE" "$OPTION"
 CODE_RETOUR=$?
 
 if [ $CODE_RETOUR -ne 0 ]; then
-    echo "Erreur lors de l'exécution du programme C."
-    exit $CODE_RETOUR
+    echo "Le programme C a rencontré une erreur (Code: $CODE_RETOUR)."
+else
+    echo "Traitement C terminé avec succès."
 fi
 
 # --- GÉNÉRATION DES GRAPHIQUES ---
-if [ "$MODE" == "histo" ]; then
+
+if [ "$MODE" == "histo" ] && [ $CODE_RETOUR -eq 0 ]; then
     FICHIER_DAT="resultat_${OPTION}.dat"
     
-    # Choix de la colonne selon l'option : 2=max, 3=src, 4=real
+    # Détermination de la colonne
     COL=2
     [ "$OPTION" == "src" ] && COL=3
     [ "$OPTION" == "real" ] && COL=4
 
-    echo "Génération des graphiques pour l'option : $OPTION (colonne $COL)..."
+    echo "Pré-tri des données pour Gnuplot..."
+    
+    # --- LA SOLUTION AU BROKEN PIPE : TRI EXTERNE ---
+    # Top 10 décroissant
+    sort -t';' -k${COL} -rn "$FICHIER_DAT" | head -n 10 > top10.tmp
+    # Bottom 50 croissant (exclut l'en-tête et les 0)
+    sort -t';' -k${COL} -n "$FICHIER_DAT" | awk -F';' -v c="$COL" '$c > 0' | head -n 50 > bot50.tmp
 
     gnuplot << EOF
         set datafile separator ";"
@@ -60,23 +84,24 @@ if [ "$MODE" == "histo" ]; then
         set grid y
         set ylabel "Volume (M.m3)"
         
-        # Top 10
         set output "${OPTION}_top10.png"
-        set title "Top 10 des plus grandes usines - $OPTION"
-        plot "< sort -t';' -k${COL} -rn ${FICHIER_DAT} | head -n 10" using ${COL}:xtic(1) title "Volume"
+        set title "Top 10 - ${OPTION}"
+        plot "top10.tmp" using ${COL}:xtic(1) title "Volume"
         
-        # Bot 50 (on trie par ordre croissant et on filtre les valeurs > 0 avec awk)
         set output "${OPTION}_bot50.png"
-        set title "50 plus petites usines (hors 0) - $OPTION"
-        plot "< sort -t';' -k${COL} -n ${FICHIER_DAT} | awk -F';' '\$${COL} > 0' | head -n 50" using ${COL}:xtic(1) title "Volume"
+        set title "50 plus petites - ${OPTION}"
+        plot "bot50.tmp" using ${COL}:xtic(1) title "Volume"
 EOF
-    echo "Graphiques créés : ${OPTION}_top10.png et ${OPTION}_bot50.png"
+    
+    rm -f top10.tmp bot50.tmp
+    echo "Graphiques générés : ${OPTION}_top10.png et ${OPTION}_bot50.png"
 fi
 
 # --- FIN ET CHRONOMÈTRE ---
+
 fin=$(date +%s%3N)
 duree=$((fin - debut))
 
 echo "-------------------------------------------"
-echo "Traitement terminé en : $duree ms"
+echo "Durée totale du script : $duree ms"
 echo "-------------------------------------------"

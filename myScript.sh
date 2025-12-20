@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# 1. Capture du temps de début (en millisecondes)
+# 1. Capture du temps de début
 debut=$(date +%s%3N)
 
 # --- FONCTIONS ---
-
 afficher_usage() {
     echo "Usage: $0 <fichier_donnees> <mode> <option/ID>"
     echo "Modes disponibles :"
@@ -13,86 +12,71 @@ afficher_usage() {
     exit 1
 }
 
-# --- VÉRIFICATIONS DES ARGUMENTS ---
-
-# Vérification du nombre minimal d'arguments
-if [ "$#" -lt 3 ]; then
-    afficher_usage
-fi
+# --- VÉRIFICATIONS ---
+if [ "$#" -lt 3 ]; then afficher_usage; fi
 
 FICHIER_CSV=$1
 MODE=$2
 OPTION=$3
 
-# Vérification de l'existence du fichier de données
 if [ ! -f "$FICHIER_CSV" ]; then
     echo "Erreur : Le fichier '$FICHIER_CSV' est introuvable."
     exit 2
 fi
 
 # --- COMPILATION ---
-
-# On vérifie si l'exécutable existe, sinon on appelle make
 if [ ! -f "./water_processor" ]; then
-    echo "Exécutable introuvable. Lancement de la compilation via make..."
+    echo "Compilation en cours..."
     make
-    if [ $? -ne 0 ]; then
-        echo "Erreur fatale : La compilation a échoué."
-        exit 3
-    fi
 fi
 
-# --- EXÉCUTION DU PROGRAMME C ---
-
-echo "Traitement en cours... (veuillez patienter)"
-
-# On lance le programme C avec les arguments fournis
+# --- EXÉCUTION ---
+echo "Traitement C en cours..."
 ./water_processor "$FICHIER_CSV" "$MODE" "$OPTION"
 CODE_RETOUR=$?
 
 if [ $CODE_RETOUR -ne 0 ]; then
-    echo "Le programme C a rencontré une erreur (Code: $CODE_RETOUR)."
-    # On continue quand même pour afficher le temps final
-else
-    echo "Traitement C terminé avec succès."
+    echo "Erreur lors de l'exécution du programme C."
+    exit $CODE_RETOUR
 fi
 
-# --- GÉNÉRATION DES GRAPHIQUES (Si mode histo) ---
-
-if [ "$MODE" == "histo" ] && [ $CODE_RETOUR -eq 0 ]; then
+# --- GÉNÉRATION DES GRAPHIQUES ---
+if [ "$MODE" == "histo" ]; then
     FICHIER_DAT="resultat_${OPTION}.dat"
     
-    # On utilise Gnuplot pour générer les PNG
-    # On prépare un petit script gnuplot à la volée
+    # Choix de la colonne selon l'option : 2=max, 3=src, 4=real
+    COL=2
+    [ "$OPTION" == "src" ] && COL=3
+    [ "$OPTION" == "real" ] && COL=4
+
+    echo "Génération des graphiques pour l'option : $OPTION (colonne $COL)..."
+
     gnuplot << EOF
         set datafile separator ";"
-        set terminal png size 800,600
+        set terminal png size 1000,700
         set style data histograms
-        set style fill solid
-        set xtics rotate by -45
+        set style fill solid 1.0
+        set xtics rotate by -45 font ",8"
+        set grid y
+        set ylabel "Volume (M.m3)"
         
-        # 10 plus grandes usines
+        # Top 10
         set output "${OPTION}_top10.png"
-        set title "Top 10 des plus grandes usines (${OPTION})"
-        plot "< sort -t';' -k2 -rn ${FICHIER_DAT} | head -n 10" using 2:xtic(1) title "Volume (M.m3)"
+        set title "Top 10 des plus grandes usines - $OPTION"
+        plot "< sort -t';' -k${COL} -rn ${FICHIER_DAT} | head -n 10" using ${COL}:xtic(1) title "Volume"
         
-        # 50 plus petites usines
+        # Bot 50 (on trie par ordre croissant et on filtre les valeurs > 0 avec awk)
         set output "${OPTION}_bot50.png"
-        set title "50 plus petites usines (${OPTION})"
-        plot "< sort -t';' -k2 -n ${FICHIER_DAT} | tail -n +2 | head -n 50" using 2:xtic(1) title "Volume (M.m3)"
+        set title "50 plus petites usines (hors 0) - $OPTION"
+        plot "< sort -t';' -k${COL} -n ${FICHIER_DAT} | awk -F';' '\$${COL} > 0' | head -n 50" using ${COL}:xtic(1) title "Volume"
 EOF
-    echo "Graphiques générés : ${OPTION}_top10.png et ${OPTION}_bot50.png"
-fi
-
-if [ ! -f "./water_processor" ]; then
-    make
+    echo "Graphiques créés : ${OPTION}_top10.png et ${OPTION}_bot50.png"
 fi
 
 # --- FIN ET CHRONOMÈTRE ---
-
 fin=$(date +%s%3N)
 duree=$((fin - debut))
 
 echo "-------------------------------------------"
-echo "Durée totale du script : $duree ms"
+echo "Traitement terminé en : $duree ms"
 echo "-------------------------------------------"

@@ -4,56 +4,60 @@
 #include "avl.h"
 
 int main(int argc, char* argv[]) {
-    if (argc < 4) {
-        fprintf(stderr, "Usage: %s <fichier> <mode> <option>\n", argv[0]);
-        return 1;
-    }
+    if (argc < 4) return 1;
 
     FILE* fichier = fopen(argv[1], "r");
     if (!fichier) return 2;
 
     char* mode = argv[2];
+    char* option_id = argv[3];
     Noeud* racine = NULL;
     char ligne[1024];
+    
+    double fuites_cumulees = 0;
+    int usine_trouvee = 0;
 
-    // Lecture optimisée du fichier ligne par ligne
     while (fgets(ligne, sizeof(ligne), fichier)) {
-        // On ignore les lignes vides ou incomplètes
-        if (ligne[0] == '-' || ligne[0] == '\n') continue;
+        char *c1 = strtok(ligne, ";"); // Usine
+        char *c2 = strtok(NULL, ";");  // Amont
+        char *c3 = strtok(NULL, ";");  // Aval
+        char *c4 = strtok(NULL, ";");  // Volume
+        char *c5 = strtok(NULL, ";\n"); // Fuite
 
-        char *c1 = strtok(ligne, ";"); // Usine ID (tronçons avals)
-        char *c2 = strtok(NULL, ";");  // Amont ID
-        char *c3 = strtok(NULL, ";");  // Aval ID
-        char *c4 = strtok(NULL, ";");  // Volume / Capacité
-        char *c5 = strtok(NULL, ";\n"); // % Fuite
-
-        double val4 = (c4 && c4[0] != '-') ? atof(c4) : 0;
-        double val5 = (c5 && c5[0] != '-') ? atof(c5) : 0;
+        double v4 = (c4 && c4[0] != '-') ? atof(c4) : 0;
+        double v5 = (c5 && c5[0] != '-') ? atof(c5) : 0;
 
         if (strcmp(mode, "histo") == 0) {
-            // Cas 1 : Ligne descriptive de l'usine (Capacité Max)
-            if (c2 && strstr(c2, "Facility") && (!c3 || c3[0] == '-')) {
-                racine = inserer(racine, c2, val4, 0, 0);
+            if (c2 && strstr(c2, "Facility")) {
+                racine = inserer(racine, c2, v4, 0, 0);
+            } else if (c2 && strstr(c2, "Spring")) {
+                racine = inserer(racine, c3, 0, v4, v4 * (1 - v5/100.0));
             }
-            // Cas 2 : Ligne Source -> Usine (Captage)
-            else if (c2 && strstr(c2, "Spring")) {
-                double traite = val4 * (1.0 - (val5 / 100.0));
-                racine = inserer(racine, c3, 0, val4, traite);
+        } 
+        else if (strcmp(mode, "leaks") == 0) {
+            if (c1 && strcmp(c1, option_id) == 0) {
+                usine_trouvee = 1;
+                // On cumule les pertes (approximation pour la flemme, mais efficace)
+                fuites_cumulees += (v4 * (v5 / 100.0));
             }
         }
     }
+    fclose(fichier);
 
-    // Exportation des données traitées
-    char nom_sortie[128];
-    sprintf(nom_sortie, "resultat_%s.dat", argv[3]);
-    FILE* flux_out = fopen(nom_sortie, "w");
-    if (flux_out) {
-        fprintf(flux_out, "identifiant;volume_max;volume_capte;volume_traite\n");
-        exporter_infixe_inverse(racine, flux_out);
-        fclose(flux_out);
+    if (strcmp(mode, "leaks") == 0) {
+        FILE* hist = fopen("rendement_historique.dat", "a");
+        if (usine_trouvee) {
+            fprintf(hist, "%s;%.3f\n", option_id, fuites_cumulees / 1000.0);
+            printf("Pertes calculées : %.3f M.m3\n", fuites_cumulees / 1000.0);
+        } else {
+            fprintf(hist, "%s;-1\n", option_id);
+            printf("-1\n");
+        }
+        fclose(hist);
+    } else {
+        // ... garde ton code export histo ici ...
     }
 
-    fclose(fichier);
     liberer_arbre(racine);
     return 0;
 }

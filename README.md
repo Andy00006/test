@@ -1,5 +1,12 @@
 # test
 
+
+pour la bibliothèque, il faut qu'elle comporte:
+<stdio.h>
+<stdlib.h>
+<string.h>
+
+
 Pour compiler le programme,ecrire dans le terminal: make 
 
 Pour faire fonctionner correctement le programme, il faut écrire dans le terminal la commande:

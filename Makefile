@@ -1,37 +1,34 @@
-# Définition du compilateur
+# Définition du compilateur et des options
 CC = gcc
-
-# Options de compilation
 CFLAGS = -Wall -Wextra -O3
 
 # Nom de l'exécutable final
 EXEC = water_processor
 
-# Liste des fichiers objets (AJOUT de leaks.o ici)
+# Liste des fichiers objets
 OBJ = main.o avl.o leaks.o
 
-# Règle principale
+# PREMIÈRE CIBLE : Compile le projet (appelée par défaut via 'make')
 all: $(EXEC)
 
-# Création de l'exécutable à partir des objets
+# Règle pour créer l'exécutable
 $(EXEC): $(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) -o $(EXEC)
 
-# Compilation du fichier main.c (dépend de avl.h)
+# Compilation des modules individuels
 main.o: main.c avl.h
 	$(CC) $(CFLAGS) -c main.c
 
-# Compilation du fichier avl.c (dépend de avl.h)
 avl.o: avl.c avl.h
 	$(CC) $(CFLAGS) -c avl.c
 
-# Compilation du fichier leaks.c (dépend de avl.h)
 leaks.o: leaks.c avl.h
 	$(CC) $(CFLAGS) -c leaks.c
 
-# Règle pour nettoyer les fichiers temporaires et les graphiques
+# CIBLE CLEAN : Efface tous les fichiers générés
 clean:
-	rm -f *.o $(EXEC) resultat_*.dat top10.tmp bot50.tmp
+	rm -f *.o $(EXEC) resultat_*.dat rendement_historique.dat top10.tmp bot50.tmp *.png
+	@echo "Nettoyage des fichiers binaires, données et graphiques terminé."
 
-# Règle pour tout recompiler
+# Règle pour forcer une recompilation propre
 rebuild: clean all

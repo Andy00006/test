@@ -3,7 +3,6 @@
 
 #include <stdio.h>
 
-// Structure représentant une usine dans l'arbre équilibré
 typedef struct Noeud {
     char identifiant[100];
     double capacite_max;
@@ -14,9 +13,10 @@ typedef struct Noeud {
     struct Noeud *droit;
 } Noeud;
 
-// Prototypes des fonctions de gestion de l'arbre
 Noeud* inserer(Noeud* noeud, char* id, double capa, double capt, double trait);
 void liberer_arbre(Noeud* racine);
 void exporter_infixe_inverse(Noeud* racine, FILE* flux_sortie);
+Noeud* rechercher_usine(Noeud* r, char* id);
+void executer_mode_leaks(Noeud* racine, char* target_id);
 
 #endif

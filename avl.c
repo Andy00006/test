@@ -57,20 +57,6 @@ Noeud* rotation_gauche(Noeud* x) {
 }
 
 Noeud* inserer(Noeud* noeud, char* id, double capa, double capt, double trait) {
-    if (!noeud) return creer_noeud(id, capa, capt, trait);
-    int comparaison = strcmp(id, noeud->identifiant);
-    if (comparaison < 0) 
-        noeud->gauche = inserer(noeud->gauche, id, capa, capt, trait);
-    else if (comparaison > 0) 
-        noeud->droit = inserer(noeud->droit, id, capa, capt, trait);
-    else {
-        noeud->capacite_max += capa;
-        noeud->volume_capte += capt;
-        noeud->volume_traite += trait;
-        return noeud;
-    }
-
-Noeud* inserer(Noeud* noeud, char* id, double capa, double capt, double trait) {
     if (noeud == NULL) {
         return creer_noeud(id, capa, capt, trait);
     }
